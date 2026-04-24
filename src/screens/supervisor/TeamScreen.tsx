@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, RefreshControl, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, StyleSheet, RefreshControl, Pressable, ActivityIndicator,StatusBar } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation } from '@react-navigation/native';
 import { getUsersApi } from '../../api/users';
@@ -7,7 +7,9 @@ import { getAttendanceSummaryApi, AttendanceSummary } from '../../api/attendance
 import { AuthUser } from '../../api/auth';
 import { EmptyState } from '../../components/EmptyState';
 import { Colors, Font, Spacing, Radius } from '../../theme';
-
+import { 
+  Users
+} from 'lucide-react-native';
 const PressableComp = Pressable as any;
 const ViewComp = View as any;
 const TextComp = Text as any;
@@ -85,17 +87,42 @@ export function TeamScreen() {
   }
 
   return (
-    <FlatListComp
-      style={styles.container} 
-      contentContainerStyle={styles.content} 
-      data={clients} 
-      keyExtractor={(i: any) => i.id}
-      refreshControl={<RefreshControlComp refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
-      ListHeaderComponent={<ViewComp style={styles.header}><TextComp style={styles.title}>My Team</TextComp><TextComp style={styles.count}>{clients.length} clients</TextComp></ViewComp>}
-      ListEmptyComponent={!loading ? <EmptyState icon="👥" title="No Clients" message="Invite clients to build your team." /> : null}
-      renderItem={renderItem}
-    />
-  ) as any;
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
+      <FlatList
+        contentContainerStyle={styles.content} 
+        data={clients} 
+        keyExtractor={(item) => item.id.toString()}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            tintColor={Colors.primary} 
+          />
+        }
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <Text style={styles.title}>My Team</Text>
+            <View style={styles.countBadge}>
+              <Users color={Colors.primary} size={14} strokeWidth={2.5} />
+              <Text style={styles.countText}>{clients.length} Clients</Text>
+            </View>
+          </View>
+        }
+        ListEmptyComponent={
+          !loading ? (
+            <EmptyState 
+              icon={Users} 
+              title="No Team Members" 
+              message="Your team directory is currently empty. Invite clients to get started." 
+            />
+          ) : null
+        }
+        renderItem={renderItem}
+      />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -116,4 +143,20 @@ const styles = StyleSheet.create({
   stat: { alignItems: 'center' },
   statValue: { color: Colors.textPrimary, fontSize: Font.size.lg, ...Font.bold },
   statLabel: { color: Colors.textMuted, fontSize: Font.size.xs, marginTop: 2 },
+  countBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary + '15',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderRadius: Radius.full,
+    gap: 6,
+  },
+  countText: { 
+    color: Colors.primary, 
+    fontSize: Font.size.xs, 
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
 });

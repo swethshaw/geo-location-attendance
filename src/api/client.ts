@@ -1,5 +1,4 @@
-// ─── Axios HTTP Client ─────────────────────────────────────────────────────────
-// Central client with auth interceptors, token refresh, and error handling.
+
 
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { getAccessToken, getRefreshToken, saveTokens, clearTokens, clearUser } from '../utils/storage';
@@ -16,13 +15,15 @@ const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue = [];
 };
 
+
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 5000,
   headers: { 'Content-Type': 'application/json' },
 });
 
-// ─── Request Interceptor: attach access token ──────────────────────────────────
+
 api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   const token = await getAccessToken();
   if (token && config.headers) {
@@ -31,7 +32,7 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   return config;
 });
 
-// ─── Response Interceptor: auto-refresh on 401 ─────────────────────────────────
+
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {

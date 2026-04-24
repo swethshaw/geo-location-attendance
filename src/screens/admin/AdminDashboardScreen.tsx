@@ -1,21 +1,32 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { 
+  View, 
+  Text, 
+  FlatList, 
+  StyleSheet, 
+  RefreshControl, 
+  ActivityIndicator,
+  ScrollView,
+  StatusBar
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { 
+  CheckCircle2, 
+  XOctagon, 
+  Users, 
+  ClipboardList, 
+  ShieldCheck 
+} from 'lucide-react-native';
+
 import { getAllAttendanceApi, AttendanceRecord, getAttendanceSummaryApi, AttendanceSummary } from '../../api/attendance';
 import { AttendanceHistoryItem } from '../../components/AttendanceHistoryItem';
 import { StatCard } from '../../components/StatCard';
 import { EmptyState } from '../../components/EmptyState';
 import { useAuth } from '../../context/AuthContext';
-import { Colors, Font, Spacing } from '../../theme';
-
-const ViewComp = View as any;
-const TextComp = Text as any;
-const FlatListComp = FlatList as any;
-const RefreshControlComp = RefreshControl as any;
-const ActivityIndicatorComp = ActivityIndicator as any;
+import { Colors, Font, Spacing, Radius } from '../../theme';
 
 export function AdminDashboardScreen() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [summary, setSummary] = useState<AttendanceSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -29,7 +40,11 @@ export function AdminDashboardScreen() {
       ]);
       if (attRes.success) setRecords(attRes.data);
       if (sumRes.success) setSummary(sumRes.data);
-    } catch {} finally { setLoading(false); }
+    } catch (error) {
+
+    } finally { 
+      setLoading(false); 
+    }
   }, []);
 
   useFocusEffect(
@@ -38,63 +53,177 @@ export function AdminDashboardScreen() {
     }, [loadData])
   );
 
-  const onRefresh = async () => { setRefreshing(true); await loadData(); setRefreshing(false); };
+  const onRefresh = async () => { 
+    setRefreshing(true); 
+    await loadData(); 
+    setRefreshing(false); 
+  };
 
   const renderHeader = () => (
-    <ViewComp>
-      <ViewComp style={styles.header}>
-        <ViewComp>
-          <TextComp style={styles.greeting}>Hello, {user?.name} 👋</TextComp>
-          <TextComp style={styles.role}>Admin Dashboard</TextComp>
-        </ViewComp>
-        <TextComp style={styles.logoutBtn} onPress={logout}>Sign Out</TextComp>
-      </ViewComp>
+    <View style={styles.headerContainer}>
+      {/* Top Bar: Greeting & Role */}
+      <View style={styles.topBar}>
+        <View style={styles.greetingContainer}>
+          <Text style={styles.greeting}>Hello, {user?.name || 'Admin'} 👋</Text>
+          <Text style={styles.role}>System Administrator</Text>
+        </View>
+        <View style={styles.roleIconWrapper}>
+          <ShieldCheck color={Colors.primary} size={24} strokeWidth={2} />
+        </View>
+      </View>
 
-      <ViewComp style={styles.statsRow}>
-        <StatCard icon="✅" label="Success" value={summary?.successful ?? 0} color={Colors.success} />
-        <StatCard icon="❌" label="Failed" value={summary?.failed ?? 0} color={Colors.error} />
-        <StatCard icon="📊" label="Total" value={summary?.total ?? 0} color={Colors.primary} />
-      </ViewComp>
+      {/* Stats Row (Horizontal Scroll for Glassmorphism Cards) */}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.statsScrollContent}
+        style={styles.statsWrapper}
+      >
+        <StatCard 
+          icon={CheckCircle2} 
+          label="Successful" 
+          value={summary?.successful ?? 0} 
+          color={Colors.success} 
+        />
+        <StatCard 
+          icon={XOctagon} 
+          label="Failed" 
+          value={summary?.failed ?? 0} 
+          color={Colors.error} 
+        />
+        <StatCard 
+          icon={Users} 
+          label="Total Scans" 
+          value={summary?.total ?? 0} 
+          color={Colors.primary} 
+        />
+      </ScrollView>
 
-      <TextComp style={styles.listTitle}>Recent Attendance</TextComp>
-    </ViewComp>
+      {/* List Header */}
+      <View style={styles.listHeaderRow}>
+        <ClipboardList color={Colors.textSecondary} size={18} strokeWidth={2.5} />
+        <Text style={styles.listTitle}>Recent Attendance Activity</Text>
+      </View>
+    </View>
   );
 
   if (loading) {
     return (
-      <ViewComp style={styles.loadingContainer}>
-        <ActivityIndicatorComp size="large" color={Colors.primary} />
-      </ViewComp>
-    ) as any;
+      <View style={styles.loadingContainer}>
+        <StatusBar barStyle="dark-content" />
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loadingText}>Syncing Data...</Text>
+      </View>
+    );
   }
 
   return (
-    <FlatListComp
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      data={records}
-      keyExtractor={(item: any) => item.id}
-      ListHeaderComponent={renderHeader}
-      ListEmptyComponent={!loading ? <EmptyState icon="📊" title="No Records" message="Attendance records will appear here." /> : null}
-      refreshControl={<RefreshControlComp refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
-      renderItem={({ item }: { item: AttendanceRecord }) => (
-        <AttendanceHistoryItem
-          record={item}
-          showUser={true}
-        />
-      )}
-    />
-  ) as any;
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
+      <FlatList
+        data={records}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={renderHeader}
+        ListEmptyComponent={
+          !loading ? (
+            <EmptyState 
+              icon={ClipboardList} 
+              title="No Activity Yet" 
+              message="Attendance records from users will appear here once they start scanning in." 
+            />
+          ) : null
+        }
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            tintColor={Colors.primary} 
+            colors={[Colors.primary]} // For Android
+          />
+        }
+        renderItem={({ item }) => (
+          <AttendanceHistoryItem
+            record={item}
+            showUser={true}
+          />
+        )}
+      />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
-  loadingContainer: { flex: 1, backgroundColor: Colors.bg, justifyContent: 'center', alignItems: 'center' },
-  content: { padding: Spacing.lg, paddingTop: Spacing.huge },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xxl },
-  greeting: { color: Colors.textPrimary, fontSize: Font.size.xl, ...Font.bold },
-  role: { color: Colors.textSecondary, fontSize: Font.size.sm, marginTop: Spacing.xs },
-  logoutBtn: { color: Colors.error, fontSize: Font.size.sm, ...Font.semibold },
-  statsRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xxl },
-  listTitle: { color: Colors.textSecondary, fontSize: Font.size.sm, ...Font.medium, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: Spacing.sm },
+  container: { 
+    flex: 1, 
+    backgroundColor: Colors.bg,
+  },
+  loadingContainer: { 
+    flex: 1, 
+    backgroundColor: Colors.bg, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: Colors.textSecondary,
+    fontSize: Font.size.sm,
+    fontWeight: '500',
+    marginTop: Spacing.md,
+  },
+  listContent: { 
+    paddingHorizontal: Spacing.lg, 
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.xxxl, // Extra padding for safe area bottom
+  },
+  headerContainer: {
+    marginBottom: Spacing.md,
+  },
+  topBar: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: Spacing.xl, 
+  },
+  greetingContainer: {
+    flex: 1,
+  },
+  greeting: { 
+    color: Colors.textPrimary, 
+    fontSize: Font.size.xl, 
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  role: { 
+    color: Colors.textSecondary, 
+    fontSize: Font.size.sm, 
+    fontWeight: '500',
+    marginTop: 4, 
+  },
+  roleIconWrapper: {
+    backgroundColor: Colors.primary + '15',
+    padding: Spacing.sm,
+    borderRadius: Radius.lg,
+  },
+  statsWrapper: {
+    marginHorizontal: -Spacing.lg, // Allows the scroll to bleed to the screen edges
+    marginBottom: Spacing.xxl,
+  },
+  statsScrollContent: { 
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.md, 
+  },
+  listHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: Spacing.md,
+  },
+  listTitle: { 
+    color: Colors.textSecondary, 
+    fontSize: Font.size.sm, 
+    fontWeight: '700',
+    textTransform: 'uppercase', 
+    letterSpacing: 0.5, 
+  },
 });

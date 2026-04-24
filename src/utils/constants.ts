@@ -1,4 +1,4 @@
-// ─── App-wide Constants ────────────────────────────────────────────────────────
+
 
 /** GPS accuracy threshold in meters. Attendance is blocked above this. */
 export const GPS_ACCURACY_THRESHOLD = 50;
@@ -26,4 +26,4 @@ export const DEFAULT_PAGE_SIZE = 20;
 export const LOCATION_TIMEOUT = 15000;
 
 /** API base URL — overridden by .env */
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:3000/api';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.0.103:3000/api';

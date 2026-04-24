@@ -2,7 +2,7 @@ import { Dimensions, PixelRatio } from 'react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Baseline dimensions for scaling (based on standard mobile screen, e.g., iPhone 11/14)
+
 const guidelineBaseWidth = 375;
 const guidelineBaseHeight = 812;
 

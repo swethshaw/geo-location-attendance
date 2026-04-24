@@ -1,5 +1,4 @@
-// ─── Auth Context ──────────────────────────────────────────────────────────────
-// Manages auth state, token persistence, role-based routing.
+
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { loginApi, registerApi, getMeApi, logoutApi, AuthUser, LoginPayload, RegisterPayload } from '../api/auth';
@@ -27,45 +26,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: false,
   });
 
-  // ─── Bootstrap: check for stored tokens on mount ──────────────────────────
+
   useEffect(() => {
     (async () => {
-      console.log('🔄 Bootstrapping auth state...');
+
       try {
         const token = await getAccessToken();
-        console.log('🔑 Token found:', !!token);
+
         
         if (token) {
-          console.log('📡 Validating session with server...');
-          // Try to validate with /auth/me
+
+
           const res = await getMeApi().catch(err => {
-            console.warn('⚠️ Session validation failed:', err.message);
+
             return { success: false, data: null };
           });
           
           if (res.success && res.data) {
-            console.log('✅ Session validated:', res.data.email);
+
             await saveUser(res.data);
             setState({ user: res.data as AuthUser, isLoading: false, isAuthenticated: true });
             return;
           }
         }
         
-        // Fallback: check stored user data
+
         const storedUser = await getStoredUser();
         if (storedUser && (storedUser as any).id) {
-          console.log('📦 Found cached user data');
+
           setState({ user: storedUser as unknown as AuthUser, isLoading: false, isAuthenticated: true });
           return;
         }
       } catch (err: any) {
-        console.error('❌ Bootstrap error:', err.message);
-        // Token invalid or expired
+
+
         await clearTokens().catch(() => {});
         await clearUser().catch(() => {});
       }
       
-      console.log('🚪 No valid session, routing to auth');
+
       setState({ user: null, isLoading: false, isAuthenticated: false });
     })();
   }, []);
@@ -91,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const refreshToken = await getRefreshToken();
       if (refreshToken) await logoutApi(refreshToken);
     } catch {
-      // Ignore logout API errors
+
     }
     await clearTokens();
     await clearUser();
@@ -106,7 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setState((s) => ({ ...s, user: res.data }));
       }
     } catch {
-      // Silently fail
+
     }
   }, []);
 

@@ -1,5 +1,4 @@
-// ─── Geofence Utilities (mirrors backend/src/utils/geofence.ts) ────────────────
-// Keeping these in sync ensures the distance the user sees matches the backend.
+
 
 /**
  * Haversine formula — calculates great-circle distance between two GPS points.

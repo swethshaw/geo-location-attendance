@@ -1,13 +1,19 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, RefreshControl, Pressable, Alert, ActivityIndicator as RNActivityIndicator } from 'react-native';
+import { 
+  View, 
+  Text, 
+  ScrollView, 
+  StyleSheet, 
+  RefreshControl, 
+  Pressable, 
+  ActivityIndicator,
+  StatusBar
+} from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { MapPinOff, AlertCircle, MapPin, Target, Radar } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
-const ViewComp = View as any;
-const TextComp = Text as any;
-const ScrollViewComp = ScrollView as any;
-const PressableComp = Pressable as any;
-const RefreshControlComp = RefreshControl as any;
-import * as Haptics from 'expo-haptics';
+import { verticalScale } from '../../utils/responsive';
 import { useLocation } from '../../hooks/useLocation';
 import { useGeofence } from '../../hooks/useGeofence';
 import { LocationCard } from '../../components/LocationCard';
@@ -33,7 +39,7 @@ export function AttendanceScreen() {
 
   const { distance, isInside } = useGeofence(location, selectedZone);
 
-  // Load zones
+
   const loadZones = useCallback(async () => {
     try {
       const res = await getLocationsApi();
@@ -44,7 +50,7 @@ export function AttendanceScreen() {
         }
       }
     } catch {
-      // Silently fail — zones will be empty
+
     } finally {
       setZonesLoading(false);
     }
@@ -64,19 +70,14 @@ export function AttendanceScreen() {
       
       const res = await getMyAttendanceApi({ from: today.toISOString() });
       if (res.success && res.data.length > 0) {
-        // Find if any record was successful or just any record for today? 
-        // User requirements say "can mark attendance one per day", 
-        // so if they marked (even failed) they might be blocked? 
-        // Usually, we block if they have a 'success' or just any record.
-        // Let's block if they have any record to be safe and match the backend logic.
         setAlreadyMarked(true);
       }
     } catch {
-      // Ignore
+
     }
   };
 
-  // Determine button state
+
   useEffect(() => {
     if (alreadyMarked) { setMarkState('success'); return; }
     if (!selectedZone) { setMarkState('no_zone'); return; }
@@ -102,7 +103,7 @@ export function AttendanceScreen() {
       if (res.success) {
         setMarkState('success');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        // Cache locally
+        
         await cacheAttendance({
           id: res.data?.record?.id,
           latitude: location.latitude,
@@ -114,8 +115,8 @@ export function AttendanceScreen() {
           marked_at: new Date().toISOString(),
           synced: true,
         });
+        
         setAlreadyMarked(true);
-        // Remove the reset timer so it stays 'success' for the day
       } else {
         throw new Error(res.error || 'Failed');
       }
@@ -124,7 +125,7 @@ export function AttendanceScreen() {
       setMarkState('error');
       setMarkError(msg);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      // Also cache failed attempt locally
+      
       await cacheAttendance({
         latitude: location.latitude,
         longitude: location.longitude,
@@ -140,110 +141,251 @@ export function AttendanceScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Promise.all([refresh(), loadZones(), checkTodayAttendance()]);
     setRefreshing(false);
   };
 
-  // Location error state
+
   if (locError && !location) {
     return (
-      <ViewComp style={styles.container}>
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
         <EmptyState
-          icon="🚫"
-          title={locError === 'permission_denied' ? 'Location Permission Required' : 'Location Unavailable'}
-          message={errorMessage || 'Unable to access your location.'}
+          icon={MapPinOff}
+          title={locError === 'permission_denied' ? 'Location Required' : 'Signal Lost'}
+          message={errorMessage || 'We need access to your location to verify your attendance.'}
           actionLabel="Retry"
           onAction={refresh}
+          iconColor={Colors.error}
         />
-      </ViewComp>
-    ) as any;
+      </View>
+    );
   }
 
   return (
-    <ScrollViewComp
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControlComp refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
-    >
-      {/* Header */}
-      <ViewComp style={styles.header}>
-        <TextComp style={styles.title}>Mark Attendance</TextComp>
-        <TextComp style={styles.subtitle}>Verify your location to check in</TextComp>
-      </ViewComp>
-
-      {/* Zone Selector */}
-      {zones.length > 0 && (
-        <ViewComp style={styles.section}>
-          <TextComp style={styles.sectionTitle}>Select Zone</TextComp>
-          <ScrollViewComp horizontal showsHorizontalScrollIndicator={false} style={styles.zoneScroll}>
-            {zones.map((z) => (
-              <PressableComp
-                key={z.id}
-                style={({ pressed }: any) => [
-                  styles.zoneChip, 
-                  selectedZone?.id === z.id && styles.zoneChipActive,
-                  { opacity: pressed ? 0.7 : 1 }
-                ]}
-                onPress={() => setSelectedZone(z)}
-              >
-                <TextComp style={[styles.zoneChipText, selectedZone?.id === z.id && styles.zoneChipTextActive]}>
-                  📍 {z.name}
-                </TextComp>
-                <TextComp style={[styles.zoneChipRadius, selectedZone?.id === z.id && styles.zoneChipTextActive]}>
-                  {z.radius_meters}m
-                </TextComp>
-              </PressableComp>
-            ))}
-          </ScrollViewComp>
-        </ViewComp>
-      )}
-
-      {zones.length === 0 && !zonesLoading && (
-        <EmptyState icon="📍" title="No Zones Available" message="An admin needs to create geo-fence zones first." />
-      )}
-
-      {/* Location Info */}
-      <ViewComp style={styles.section}>
-        <LocationCard location={location} isLoading={locLoading} />
-      </ViewComp>
-
-      {/* Accuracy Gauge */}
-      <ViewComp style={styles.section}>
-        <AccuracyGauge accuracy={location?.accuracy ?? null} />
-      </ViewComp>
-
-      {/* Geofence Status */}
-      {selectedZone && (
-        <ViewComp style={styles.section}>
-          <GeofenceStatus
-            distance={distance}
-            isInside={isInside}
-            radiusMeters={selectedZone.radius_meters}
-            zoneName={selectedZone.name}
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            tintColor={Colors.primary} 
           />
-        </ViewComp>
-      )}
+        }
+      >
 
-      {/* Mark Button */}
-      <ViewComp style={styles.section}>
-        <AttendanceButton state={markState} onPress={handleMark} errorMessage={markError} />
-      </ViewComp>
-    </ScrollViewComp>
-  ) as any;
+        <View style={styles.header}>
+          <Text style={styles.title}>Mark Attendance</Text>
+          <Text style={styles.subtitle}>Verify your location to check in</Text>
+        </View>
+
+
+        {zones.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <MapPin color={Colors.textSecondary} size={16} strokeWidth={2.5} />
+              <Text style={styles.sectionTitle}>Select Workspace</Text>
+            </View>
+            
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false} 
+              style={styles.zoneScrollWrapper}
+              contentContainerStyle={styles.zoneScrollContent}
+            >
+              {zones.map((z) => {
+                const isActive = selectedZone?.id === z.id;
+                return (
+                  <Pressable
+                    key={z.id}
+                    style={({ pressed }) => [
+                      styles.zoneChip, 
+                      isActive && styles.zoneChipActive,
+                      pressed && { transform: [{ scale: 0.96 }] }
+                    ]}
+                    onPress={() => {
+                      if (!isActive) Haptics.selectionAsync();
+                      setSelectedZone(z);
+                    }}
+                  >
+                    <View style={[styles.zoneIconWrapper, isActive && styles.zoneIconWrapperActive]}>
+                      <MapPin color={isActive ? Colors.primary : Colors.textMuted} size={14} strokeWidth={3} />
+                    </View>
+                    <View>
+                      <Text style={[styles.zoneChipText, isActive && styles.zoneChipTextActive]}>
+                        {z.name}
+                      </Text>
+                      <Text style={[styles.zoneChipRadius, isActive && styles.zoneChipRadiusActive]}>
+                        Radius: {z.radius_meters}m
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
+        {zones.length === 0 && !zonesLoading && (
+          <EmptyState 
+            icon={AlertCircle} 
+            title="No Zones Available" 
+            message="An administrator needs to create geographic zones before you can mark attendance." 
+          />
+        )}
+
+
+        {selectedZone && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Radar color={Colors.textSecondary} size={16} strokeWidth={2.5} />
+              <Text style={styles.sectionTitle}>Live Telemetry</Text>
+            </View>
+            
+            <View style={styles.telemetryStack}>
+              <LocationCard location={location} isLoading={locLoading} />
+              <AccuracyGauge accuracy={location?.accuracy ?? null} />
+            </View>
+          </View>
+        )}
+
+
+        {selectedZone && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Target color={Colors.textSecondary} size={16} strokeWidth={2.5} />
+              <Text style={styles.sectionTitle}>Boundary Status</Text>
+            </View>
+            <GeofenceStatus
+              distance={distance}
+              isInside={isInside}
+              radiusMeters={selectedZone.radius_meters}
+              zoneName={selectedZone.name}
+            />
+          </View>
+        )}
+
+
+        <View style={styles.actionContainer}>
+          <AttendanceButton state={markState} onPress={handleMark} errorMessage={markError} />
+        </View>
+      </ScrollView>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
-  content: { padding: Spacing.lg, paddingTop: Spacing.huge },
-  header: { marginBottom: Spacing.xxl },
-  title: { color: Colors.textPrimary, fontSize: Font.size.xxxl, ...Font.bold },
-  subtitle: { color: Colors.textSecondary, fontSize: Font.size.md, marginTop: Spacing.xs },
-  section: { marginBottom: Spacing.lg },
-  sectionTitle: { color: Colors.textSecondary, fontSize: Font.size.sm, ...Font.medium, marginBottom: Spacing.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
-  zoneScroll: { flexDirection: 'row' },
-  zoneChip: { backgroundColor: Colors.surface, borderRadius: Radius.full, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, marginRight: Spacing.sm, borderWidth: 1, borderColor: Colors.border, alignItems: 'center' },
-  zoneChipActive: { backgroundColor: Colors.primaryBg, borderColor: Colors.primary },
-  zoneChipText: { color: Colors.textSecondary, fontSize: Font.size.sm, ...Font.medium },
-  zoneChipTextActive: { color: Colors.primary },
-  zoneChipRadius: { color: Colors.textMuted, fontSize: Font.size.xs, marginTop: 2 },
+  container: { 
+    flex: 1, 
+    backgroundColor: Colors.bg 
+  },
+  content: { 
+    padding: Spacing.lg, 
+    paddingTop: Spacing.xl, 
+    paddingBottom: verticalScale(120), 
+
+  },
+  header: { 
+    marginBottom: Spacing.xl 
+  },
+  title: { 
+    color: Colors.textPrimary, 
+    fontSize: Font.size.xxl, 
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  subtitle: { 
+    color: Colors.textSecondary, 
+    fontSize: Font.size.md, 
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  
+  section: { 
+    marginBottom: Spacing.xl 
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: Spacing.sm,
+  },
+  sectionTitle: { 
+    color: Colors.textSecondary, 
+    fontSize: Font.size.sm, 
+    fontWeight: '700', 
+    textTransform: 'uppercase', 
+    letterSpacing: 0.5 
+  },
+  
+  // Zone Chips
+  zoneScrollWrapper: {
+    marginHorizontal: -Spacing.lg, 
+
+  },
+  zoneScrollContent: { 
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  zoneChip: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface, 
+    borderRadius: Radius.xl, 
+    paddingHorizontal: Spacing.md, 
+    paddingVertical: 12, 
+    borderWidth: 1, 
+    borderColor: Colors.border, 
+    gap: 10,
+
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 1,
+  },
+  zoneChipActive: { 
+    backgroundColor: Colors.primary + '10', 
+    borderColor: Colors.primary,
+  },
+  zoneIconWrapper: {
+    backgroundColor: Colors.surfaceAlt,
+    padding: 6,
+    borderRadius: Radius.full,
+  },
+  zoneIconWrapperActive: {
+    backgroundColor: Colors.primary + '20',
+  },
+  zoneChipText: { 
+    color: Colors.textPrimary, 
+    fontSize: Font.size.sm, 
+    fontWeight: '700' 
+  },
+  zoneChipTextActive: { 
+    color: Colors.primary 
+  },
+  zoneChipRadius: { 
+    color: Colors.textSecondary, 
+    fontSize: 11, 
+    fontWeight: '500',
+    marginTop: 2 
+  },
+  zoneChipRadiusActive: {
+    color: Colors.primary,
+    opacity: 0.8,
+  },
+
+
+  telemetryStack: {
+    gap: Spacing.md,
+  },
+
+
+  actionContainer: {
+    marginTop: Spacing.sm,
+  },
 });

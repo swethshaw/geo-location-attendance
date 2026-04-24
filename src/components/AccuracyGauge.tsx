@@ -1,8 +1,5 @@
-// ─── Accuracy Gauge Component ──────────────────────────────────────────────────
-// Visual meter showing GPS accuracy: green (<20m), yellow (20-50m), red (>50m).
-
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { Colors, Font, Spacing, Radius } from '../theme';
 import { getAccuracyLevel, GPS_ACCURACY_THRESHOLD } from '../utils/constants';
 
@@ -10,116 +7,165 @@ interface Props {
   accuracy: number | null;
 }
 
-const ViewComp = View as any;
-const TextComp = Text as any;
-
 export function AccuracyGauge({ accuracy }: Props) {
-  if (accuracy === null) {
-    return (
-      <ViewComp style={styles.container}>
-        <TextComp style={styles.label}>GPS Accuracy</TextComp>
-        <ViewComp style={styles.barBg}>
-          <ViewComp style={[styles.barFill, { width: '0%', backgroundColor: Colors.textMuted }]} />
-        </ViewComp>
-        <TextComp style={styles.value}>Waiting for signal...</TextComp>
-      </ViewComp>
-    ) as any;
-  }
+  // Animation value for smooth bar transitions
+  const animatedWidth = React.useRef(new Animated.Value(0)).current;
 
-  const level = getAccuracyLevel(accuracy);
-  // Map accuracy to percentage (0m = 100%, 100m+ = 0%)
-  const pct = Math.max(0, Math.min(100, ((100 - accuracy) / 100) * 100));
-  const blocked = accuracy > GPS_ACCURACY_THRESHOLD;
+  const level = accuracy !== null ? getAccuracyLevel(accuracy) : null;
+  const isBlocked = accuracy !== null && accuracy > GPS_ACCURACY_THRESHOLD;
+  
+  // Calculate percentage: 100% (best) to 0% (poor)
+  const pct = accuracy === null 
+    ? 0 
+    : Math.max(5, Math.min(100, ((100 - accuracy) / 100) * 100));
+
+  useEffect(() => {
+    Animated.spring(animatedWidth, {
+      toValue: pct,
+      useNativeDriver: false, // Width requires layout engine
+      bounciness: 4,
+    }).start();
+  }, [pct]);
 
   return (
-    <ViewComp style={styles.container}>
-      <ViewComp style={styles.header}>
-        <TextComp style={styles.label}>GPS Accuracy</TextComp>
-        <ViewComp style={[styles.badge, { backgroundColor: level.color + '20' }]}>
-          <TextComp style={[styles.badgeText, { color: level.color }]}>{level.label}</TextComp>
-        </ViewComp>
-      </ViewComp>
-
-      <ViewComp style={styles.barBg}>
-        <ViewComp
-          style={[
-            styles.barFill,
-            {
-              width: `${pct}%`,
-              backgroundColor: level.color,
-            },
-          ]}
-        />
-      </ViewComp>
-
-      <ViewComp style={styles.footer}>
-        <TextComp style={[styles.value, { color: level.color }]}>
-          ±{Math.round(accuracy)}m
-        </TextComp>
-        {blocked && (
-          <TextComp style={styles.blocked}>
-            ⚠ Must be ≤{GPS_ACCURACY_THRESHOLD}m to mark attendance
-          </TextComp>
+    <View style={[styles.container, isBlocked && styles.containerWarning]}>
+      {/* Header with Semantic Status */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.label}>Signal Strength</Text>
+          <Text style={styles.subLabel}>
+            {accuracy === null ? 'Searching for satellites...' : `Precision: ±${Math.round(accuracy)}m`}
+          </Text>
+        </View>
+        {level && (
+          <View style={[styles.badge, { backgroundColor: level.color + '15' }]}>
+            <View style={[styles.dot, { backgroundColor: level.color }]} />
+            <Text style={[styles.badgeText, { color: level.color }]}>{level.label}</Text>
+          </View>
         )}
-      </ViewComp>
-    </ViewComp>
-  ) as any;
+      </View>
+
+      {/* Modern Gradient-style Progress Track */}
+      <View style={styles.track}>
+        <Animated.View 
+          style={[
+            styles.fill, 
+            { 
+              width: animatedWidth.interpolate({
+                inputRange: [0, 100],
+                outputRange: ['0%', '100%']
+              }),
+              backgroundColor: level?.color ?? Colors.textMuted 
+            }
+          ]} 
+        />
+        {/* Threshold Marker */}
+        <View style={[styles.thresholdMarker, { left: `${100 - GPS_ACCURACY_THRESHOLD}%` }]} />
+      </View>
+
+      {/* Contextual Action/Warning Footer */}
+      <View style={styles.footer}>
+        {accuracy === null ? (
+          <Text style={styles.infoText}>Move to an open area for faster locking</Text>
+        ) : isBlocked ? (
+          <Text style={styles.errorText}>
+            Too far (Max {GPS_ACCURACY_THRESHOLD}m). Move closer to your location.
+          </Text>
+        ) : (
+          <Text style={styles.successText}>✓ Location verified for attendance</Text>
+        )}
+      </View>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
   container: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.xl, // Softer corners
     padding: Spacing.lg,
     borderWidth: 1,
     borderColor: Colors.border,
+    // Subtle Shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  containerWarning: {
+    borderColor: Colors.error + '30',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
+    alignItems: 'flex-start',
+    marginBottom: Spacing.md,
   },
   label: {
+    color: Colors.textPrimary,
+    fontSize: Font.size.md,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  subLabel: {
     color: Colors.textSecondary,
-    fontSize: Font.size.sm,
-    ...Font.medium,
+    fontSize: Font.size.xs,
+    marginTop: 2,
   },
   badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
+    paddingVertical: 4,
     borderRadius: Radius.full,
   },
-  badgeText: {
-    fontSize: Font.size.xs,
-    ...Font.semibold,
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
   },
-  barBg: {
-    height: 8,
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  track: {
+    height: 10,
     backgroundColor: Colors.surfaceAlt,
     borderRadius: Radius.full,
     overflow: 'hidden',
-    marginBottom: Spacing.sm,
+    position: 'relative',
   },
-  barFill: {
+  fill: {
     height: '100%',
     borderRadius: Radius.full,
   },
+  thresholdMarker: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 2,
+    backgroundColor: Colors.surface, // Creates a 'cut' in the bar
+    opacity: 0.5,
+  },
   footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    marginTop: Spacing.sm,
   },
-  value: {
-    fontSize: Font.size.md,
-    ...Font.bold,
+  infoText: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
   },
-  blocked: {
+  errorText: {
+    fontSize: 12,
     color: Colors.error,
-    fontSize: Font.size.xs,
-    ...Font.medium,
-    flex: 1,
-    textAlign: 'right',
-    marginLeft: Spacing.sm,
+    fontWeight: '600',
+  },
+  successText: {
+    fontSize: 12,
+    color: Colors.success,
+    fontWeight: '600',
   },
 });

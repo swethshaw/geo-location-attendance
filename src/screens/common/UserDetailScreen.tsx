@@ -1,20 +1,40 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  FlatList, 
+  ActivityIndicator,
+  ScrollView,
+  StatusBar
+} from 'react-native';
+import { useRoute, useNavigation, useFocusEffect, RouteProp } from '@react-navigation/native';
+import { 
+  User, 
+  Mail, 
+  CalendarDays, 
+  History, 
+  Activity, 
+  CheckCircle2, 
+  XOctagon 
+} from 'lucide-react-native';
+
 import { getAllAttendanceApi, getAttendanceSummaryApi, AttendanceRecord, AttendanceSummary } from '../../api/attendance';
 import { AttendanceHistoryItem } from '../../components/AttendanceHistoryItem';
 import { CalendarHeatmap } from '../../components/CalendarHeatmap';
+import { StatCard } from '../../components/StatCard';
 import { EmptyState } from '../../components/EmptyState';
 import { Colors, Font, Spacing, Radius } from '../../theme';
 
-const ViewComp = View as any;
-const TextComp = Text as any;
-const FlatListComp = FlatList as any;
-const ActivityIndicatorComp = ActivityIndicator as any;
+
+type UserDetailRouteProp = RouteProp<Record<string, { userId: string; userName: string; userEmail: string }>, string>;
+
+
+type HeatmapStatus = 'success' | 'low_accuracy' | 'outside_radius' | 'failed';
 
 export function UserDetailScreen() {
-  const route = useRoute() as any;
-  const navigation = useNavigation() as any;
+  const route = useRoute<UserDetailRouteProp>();
+  const navigation = useNavigation();
   const { userId, userName, userEmail } = route.params;
 
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -32,7 +52,7 @@ export function UserDetailScreen() {
       if (recRes.success) setRecords(recRes.data);
       if (sumRes.success) setSummary(sumRes.data);
     } catch (err) {
-      console.error('Failed to fetch user details:', err);
+
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -47,22 +67,35 @@ export function UserDetailScreen() {
 
   useEffect(() => {
     navigation.setOptions({ title: userName || 'User Details' });
-  }, [userName]);
+  }, [userName, navigation]);
 
   if (loading) {
     return (
-      <ViewComp style={styles.loading}>
-        <ActivityIndicatorComp size="large" color={Colors.primary} />
-      </ViewComp>
-    ) as any;
+      <View style={styles.loadingContainer}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loadingText}>Loading Profile...</Text>
+      </View>
+    );
   }
 
-  // Group summary data for heatmap
+
   const heatmapData = summary ? Object.entries(
-    summary.last_30_days.reduce((acc: Record<string, { status: string; count: number }>, r) => {
+    summary.last_30_days.reduce((acc: Record<string, { status: HeatmapStatus; count: number }>, r) => {
       const date = r.marked_at.split('T')[0];
-      if (!acc[date]) acc[date] = { status: r.status, count: 1 };
-      else { acc[date].count++; if (r.status === 'success') acc[date].status = 'success'; }
+      
+
+      let mappedStatus: HeatmapStatus = 'failed';
+      if (r.status === 'success') mappedStatus = 'success';
+      if (r.status === 'low_accuracy') mappedStatus = 'low_accuracy';
+      if (r.status === 'outside_radius') mappedStatus = 'outside_radius';
+
+      if (!acc[date]) {
+        acc[date] = { status: mappedStatus, count: 1 };
+      } else { 
+        acc[date].count++; 
+        if (mappedStatus === 'success') acc[date].status = 'success'; 
+      }
       return acc;
     }, {})
   ).map(([date, data]) => ({
@@ -71,60 +104,186 @@ export function UserDetailScreen() {
     count: data.count
   })) : [];
 
+  const initial = userName ? userName.charAt(0).toUpperCase() : '?';
+
   return (
-    <FlatListComp
-      data={records}
-      keyExtractor={(item: any) => item.id}
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshing={refreshing}
-      onRefresh={() => { setRefreshing(true); fetchData(); }}
-      ListHeaderComponent={
-        <>
-          <ViewComp style={styles.header}>
-            <TextComp style={styles.name}>{userName}</TextComp>
-            <TextComp style={styles.email}>{userEmail}</TextComp>
-          </ViewComp>
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
+      <FlatList
+        data={records}
+        keyExtractor={(item) => item.id.toString()}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshing={refreshing}
+        onRefresh={() => { setRefreshing(true); fetchData(); }}
+        ListHeaderComponent={
+          <>
 
-          {summary && (
-            <ViewComp style={styles.statsGrid}>
-              <ViewComp style={styles.statCard}>
-                <TextComp style={styles.statVal}>{summary.total}</TextComp>
-                <TextComp style={styles.statLabel}>Total</TextComp>
-              </ViewComp>
-              <ViewComp style={styles.statCard}>
-                <TextComp style={[styles.statVal, { color: Colors.success }]}>{summary.successful}</TextComp>
-                <TextComp style={styles.statLabel}>Success</TextComp>
-              </ViewComp>
-              <ViewComp style={styles.statCard}>
-                <TextComp style={[styles.statVal, { color: Colors.error }]}>{summary.failed}</TextComp>
-                <TextComp style={styles.statLabel}>Failed</TextComp>
-              </ViewComp>
-            </ViewComp>
-          )}
+            <View style={styles.profileHeader}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{initial}</Text>
+              </View>
+              <View style={styles.profileInfo}>
+                <Text style={styles.name} numberOfLines={1}>{userName}</Text>
+                <View style={styles.emailRow}>
+                  <Mail color={Colors.textMuted} size={14} />
+                  <Text style={styles.email} numberOfLines={1}>{userEmail}</Text>
+                </View>
+              </View>
+            </View>
 
-          <TextComp style={styles.sectionTitle}>Activity Heatmap</TextComp>
-          <CalendarHeatmap attendanceDays={heatmapData as any} />
 
-          <TextComp style={styles.sectionTitle}>Recent History</TextComp>
-        </>
-      }
-      renderItem={({ item }: { item: AttendanceRecord }) => <AttendanceHistoryItem record={item} showUser={false} />}
-      ListEmptyComponent={<EmptyState icon="🕒" title="No Records" message="This user hasn't marked any attendance yet." />}
-    />
-  ) as any;
+            {summary && (
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.statsScrollContent}
+                style={styles.statsWrapper}
+              >
+                <StatCard 
+                  icon={Activity} 
+                  label="Total Scans" 
+                  value={summary.total ?? 0} 
+                  color={Colors.primary} 
+                />
+                <StatCard 
+                  icon={CheckCircle2} 
+                  label="Successful" 
+                  value={summary.successful ?? 0} 
+                  color={Colors.success} 
+                />
+                <StatCard 
+                  icon={XOctagon} 
+                  label="Failed" 
+                  value={summary.failed ?? 0} 
+                  color={Colors.error} 
+                />
+              </ScrollView>
+            )}
+
+
+            <View style={styles.sectionHeader}>
+              <CalendarDays color={Colors.textSecondary} size={20} strokeWidth={2.5} />
+              <Text style={styles.sectionTitle}>Activity Heatmap</Text>
+            </View>
+            <CalendarHeatmap attendanceDays={heatmapData} />
+
+
+            <View style={[styles.sectionHeader, { marginTop: Spacing.xxl }]}>
+              <History color={Colors.textSecondary} size={20} strokeWidth={2.5} />
+              <Text style={styles.sectionTitle}>Recent History</Text>
+            </View>
+          </>
+        }
+        renderItem={({ item }) => <AttendanceHistoryItem record={item} showUser={false} />}
+        ListEmptyComponent={
+          <EmptyState 
+            icon={History} 
+            title="No Activity Yet" 
+            message={`${userName} hasn't marked any attendance on the system yet.`} 
+          />
+        }
+      />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
-  content: { padding: Spacing.lg },
-  loading: { flex: 1, backgroundColor: Colors.bg, justifyContent: 'center', alignItems: 'center' },
-  header: { marginBottom: Spacing.xl },
-  name: { color: Colors.textPrimary, fontSize: Font.size.xxl, ...Font.bold },
-  email: { color: Colors.textSecondary, fontSize: Font.size.md },
-  statsGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: Spacing.xl },
-  statCard: { flex: 1, backgroundColor: Colors.surface, padding: Spacing.md, borderRadius: Radius.md, alignItems: 'center', marginHorizontal: 4, borderWidth: 1, borderColor: Colors.border },
-  statVal: { color: Colors.textPrimary, fontSize: Font.size.xl, ...Font.bold },
-  statLabel: { color: Colors.textMuted, fontSize: Font.size.xs, marginTop: 2, textTransform: 'uppercase' },
-  sectionTitle: { color: Colors.textPrimary, fontSize: Font.size.lg, ...Font.bold, marginTop: Spacing.lg, marginBottom: Spacing.md },
+  container: { 
+    flex: 1, 
+    backgroundColor: Colors.bg 
+  },
+  content: { 
+    padding: Spacing.lg,
+    paddingBottom: Spacing.xxxl, 
+  },
+  loadingContainer: { 
+    flex: 1, 
+    backgroundColor: Colors.bg, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  loadingText: {
+    color: Colors.textSecondary,
+    fontSize: Font.size.sm,
+    fontWeight: '500',
+    marginTop: Spacing.md,
+  },
+  
+
+  profileHeader: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    padding: Spacing.lg,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: Spacing.xl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 1,
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.primary + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.md,
+  },
+  avatarText: {
+    color: Colors.primary,
+    fontSize: Font.size.xxl,
+    fontWeight: '800',
+  },
+  profileInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  name: { 
+    color: Colors.textPrimary, 
+    fontSize: Font.size.xl, 
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    marginBottom: 4,
+  },
+  emailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  email: { 
+    color: Colors.textSecondary, 
+    fontSize: Font.size.sm,
+    fontWeight: '500',
+  },
+
+
+  statsWrapper: {
+    marginHorizontal: -Spacing.lg, 
+
+    marginBottom: Spacing.xxl,
+  },
+  statsScrollContent: { 
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.md, 
+  },
+
+
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+    gap: 8,
+  },
+  sectionTitle: { 
+    color: Colors.textPrimary, 
+    fontSize: Font.size.lg, 
+    fontWeight: '800', 
+    letterSpacing: -0.3,
+  },
 });

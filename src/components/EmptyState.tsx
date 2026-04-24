@@ -1,72 +1,141 @@
-// ─── Empty State Component ─────────────────────────────────────────────────────
-
-import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { LucideIcon } from 'lucide-react-native';
 import { Colors, Font, Spacing, Radius } from '../theme';
 
 interface Props {
-  icon: string;
+  icon: LucideIcon;
   title: string;
   message: string;
   actionLabel?: string;
   onAction?: () => void;
+  /** Optional: Override the default primary color for context (e.g., Colors.error for an error state) */
+  iconColor?: string; 
 }
 
-const ViewComp = View as any;
-const TextComp = Text as any;
-const PressableComp = Pressable as any;
+export function EmptyState({ 
+  icon: Icon, 
+  title, 
+  message, 
+  actionLabel, 
+  onAction,
+  iconColor = Colors.primary 
+}: Props) {
+  // Smooth entrance animation for a premium feel
+  const animValue = useRef(new Animated.Value(0)).current;
 
-export function EmptyState({ icon, title, message, actionLabel, onAction }: Props) {
+  useEffect(() => {
+    Animated.spring(animValue, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 60,
+      friction: 8,
+    }).start();
+  }, [animValue]);
+
+  const handlePress = () => {
+    if (onAction) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      onAction();
+    }
+  };
+
   return (
-    <ViewComp style={styles.container}>
-      <TextComp style={styles.icon}>{icon}</TextComp>
-      <TextComp style={styles.title}>{title}</TextComp>
-      <TextComp style={styles.message}>{message}</TextComp>
+    <Animated.View 
+      style={[
+        styles.container,
+        {
+          opacity: animValue,
+          transform: [{
+            scale: animValue.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.95, 1], // Subtle scale up
+            })
+          }]
+        }
+      ]}
+    >
+      {/* Soft Icon Illustration Container */}
+      <View style={[styles.iconWrapper, { backgroundColor: iconColor + '15' }]}>
+        <Icon color={iconColor} size={40} strokeWidth={2} />
+      </View>
+
+      <View style={styles.textContainer}>
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.message}>{message}</Text>
+      </View>
+
       {actionLabel && onAction && (
-        <PressableComp 
-          style={({ pressed }: any) => [styles.button, { opacity: pressed ? 0.8 : 1 }]} 
-          onPress={onAction}
+        <Pressable 
+          onPress={handlePress}
+          style={({ pressed }) => [
+            styles.button,
+            pressed && styles.buttonPressed
+          ]}
         >
-          <TextComp style={styles.buttonText}>{actionLabel}</TextComp>
-        </PressableComp>
+          <Text style={styles.buttonText}>{actionLabel}</Text>
+        </Pressable>
       )}
-    </ViewComp>
-  ) as any;
+    </Animated.View>
+  );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1, // Ensures it takes up available space to center properly
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: Spacing.xxxl,
+    paddingHorizontal: Spacing.xxl,
     paddingVertical: Spacing.huge,
   },
-  icon: {
-    fontSize: 48,
-    marginBottom: Spacing.lg,
+  iconWrapper: {
+    width: 88,
+    height: 88,
+    borderRadius: Radius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+  },
+  textContainer: {
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
   },
   title: {
     color: Colors.textPrimary,
-    fontSize: Font.size.lg,
-    ...Font.bold,
+    fontSize: Font.size.xl,
+    fontWeight: '700',
+    letterSpacing: -0.5,
     marginBottom: Spacing.sm,
     textAlign: 'center',
   },
   message: {
     color: Colors.textSecondary,
-    fontSize: Font.size.sm,
+    fontSize: Font.size.md,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 22, // Increased line height for better readability
+    maxWidth: '85%', // Prevents text from stretching too wide on tablets/large phones
   },
   button: {
-    marginTop: Spacing.xl,
     backgroundColor: Colors.primary,
-    paddingHorizontal: Spacing.xxl,
+    paddingHorizontal: Spacing.xxxl,
     paddingVertical: Spacing.md,
     borderRadius: Radius.full,
+    // Subtle shadow for the action button
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  buttonPressed: {
+    transform: [{ scale: 0.96 }], // Tactile squish effect
+    opacity: 0.9,
   },
   buttonText: {
     color: Colors.white,
-    fontSize: Font.size.sm,
-    ...Font.semibold,
+    fontSize: Font.size.md,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
 });
