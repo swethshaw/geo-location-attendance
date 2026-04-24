@@ -19,7 +19,7 @@ const processQueue = (error: unknown, token: string | null = null) => {
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 5000,
+  timeout: 30000, // Increased to 30s to handle Render's cold starts on free tier
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -40,6 +40,11 @@ api.interceptors.response.use(
     if (!originalRequest) return Promise.reject(error);
 
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // Don't attempt refresh for login/register endpoints
+      if (originalRequest.url?.includes('/auth/login') || originalRequest.url?.includes('/auth/register')) {
+        return Promise.reject(error);
+      }
+
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });

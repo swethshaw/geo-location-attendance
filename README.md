@@ -1,109 +1,79 @@
-# 📱 Geo-Attendance Mobile App
+# 📱 Geo-Attendance System (Assignment Submission)
 
-A premium, high-performance React Native application built with Expo for geo-fenced attendance tracking. This app features a sophisticated role-based interface, real-time location validation, and a state-of-the-art glassmorphic design.
-
----
-
-## 🌟 Key Features
-
-### 👤 Role-Based Experience
-The app dynamically adapts its interface based on the authenticated user's role:
-- **Admin**: Full control over geo-fence zones, user directory management, and system-wide invitations.
-- **Supervisor**: Manage specific teams, track client attendance, and send invitations.
-- **Client**: Real-time geo-fenced check-ins, personal attendance history, and activity heatmaps.
-
-### 📍 Intelligent Geo-Fencing
-- **Precise Validation**: Uses Haversine formula to calculate the exact distance from the center of a zone.
-- **Accuracy Thresholds**: Blocks attendance marking if GPS accuracy is poor (above 50m) to prevent spoofing.
-- **Live Telemetry**: Real-time feedback on distance to the nearest zone and GPS signal strength.
-
-### 📊 Visualization & Analytics
-- **Activity Heatmaps**: Visual representation of attendance consistency over the last 30 days.
-- **Stat Cards**: Quick-glance metrics for total, successful, and failed scans.
-- **Detailed History**: Full audit trail of all attendance attempts with status breakdown.
-
-### 💎 Premium UI/UX
-- **Glassmorphism**: Sophisticated blur effects and translucency using `expo-blur`.
-- **Responsive Scaling**: Custom scaling engine ensures a consistent look across all screen sizes (phones to tablets).
-- **Haptic Feedback**: Tactile responses for critical actions using `expo-haptics`.
-- **Dark Mode First**: A sleek, modern dark theme optimized for high-end displays.
+A location-aware React Native application built to simulate a real-world attendance system with geo-fencing and GPS accuracy constraints.
 
 ---
 
-## 🛠 Tech Stack
+## 1. Overview
+This application allows users to mark their attendance only when they are physically within a defined geographic boundary. It focuses on handling native device capabilities (GPS, Permissions) and real-world edge cases like signal inaccuracy.
 
-- **Core**: [React Native](https://reactnative.dev/) + [Expo](https://expo.dev/)
-- **Navigation**: [React Navigation](https://reactnavigation.org/) (Stack & Bottom Tabs)
-- **Icons**: [Lucide React Native](https://lucide.dev/)
-- **Location**: [Expo Location](https://docs.expo.dev/versions/latest/sdk/location/)
-- **Storage**: 
-  - `expo-secure-store`: Encrypted storage for authentication tokens.
-  - `@react-native-async-storage/async-storage`: Caching and non-sensitive data.
-- **Networking**: [Axios](https://axios-http.com/) with automatic token refresh interceptors.
-- **Maps**: [React Native Maps](https://github.com/react-native-maps/react-native-maps)
-- **Feedback**: `expo-haptics` & `expo-blur`
-
----
-
-## 📁 Project Structure
-
-```text
-mobile/
-├── src/
-│   ├── api/          # Axios client & role-specific API modules
-│   ├── components/   # Reusable UI components (Cards, Gauges, Buttons)
-│   ├── context/      # AuthContext & global state providers
-│   ├── hooks/        # Custom hooks (useLocation, useGeofence)
-│   ├── screens/      # Role-based screen directories (Admin, Supervisor, Client)
-│   ├── theme/        # Design system (Colors, Spacing, Typography, Shadows)
-│   └── utils/        # Helpers (Haversine logic, Responsive scaling)
-├── assets/           # Static assets and splash screens
-└── App.tsx           # Entry point & Main Navigation Container
-```
-
----
-
-## 🚀 Getting Started
+## 2. Setup Instructions
 
 ### Prerequisites
-- Node.js (v18+)
-- Expo Go app on your physical device or an Android/iOS emulator.
+- **Node.js** (v18+)
+- **npm** (v9+)
+- **Expo CLI** (`npm install -g expo-cli`)
+- **Expo Go** app (installed on your physical iOS/Android device)
 
-### Installation
-1. Navigate to the mobile directory:
+### Steps to Run
+1. **Clone the repository**:
    ```bash
-   cd mobile
+   git clone <repository-url>
+   cd geo-attendance/mobile
    ```
-2. Install dependencies:
+2. **Install dependencies**:
    ```bash
    npm install
    ```
-
-### Environment Setup
-Create a `.env` file in the root of the `mobile` directory:
-```env
-EXPO_PUBLIC_API_URL=http://your-api-url:3000/api
-```
-
-### Running the App
-- **Start Expo CLI**: `npm start`
-- **Run on Android**: `npm run android`
-- **Run on iOS**: `npm run ios`
+3. **Configure Environment**:
+   - Copy `.env.example` to `.env`.
+   - Set `EXPO_PUBLIC_API_URL` to your backend IP (e.g., `http://192.168.1.10:3000/api`).
+4. **Start the project**:
+   ```bash
+   npx expo start
+   ```
+5. **Open on Device**: Scan the QR code using the **Expo Go** app.
 
 ---
 
-## 🔒 Security & Optimization
-- **Token Refresh**: Automatic handling of expired access tokens using a silent refresh queue.
-- **Offline Ready**: Attendance records are cached locally if a sync fails, ensuring data integrity in low-connectivity areas.
-- **Production Clean**: All debug logs and development comments are stripped for the production build.
+## 3. Key Technical Decisions
+
+### 📍 Geo-fencing Logic: Haversine Formula
+I implemented the **Haversine formula** (`src/utils/geofence.ts`) to calculate the great-circle distance between the user's current GPS coordinates and the target center point.
+- **Approach**: Instead of using a library, I implemented the math manually to demonstrate an understanding of geographic coordinates. The formula accounts for the Earth's curvature, providing high precision over short distances.
+- **Decision**: Using a custom implementation avoids "library bloat" and ensures that the core logic is transparent and easily auditable.
+
+### 🎯 Accuracy Handling Decisions
+- **Threshold**: I defined a strict threshold of **50 meters**.
+- **Reasoning**: Real-world GPS data often "drifts." A threshold of 50m ensures that we aren't accepting "guesses" from the device. If the device reports an accuracy of ±120m, the user might actually be outside the radius even if the point appears inside. 
+- **Implementation**: The "Mark Attendance" button is dynamically disabled, and a visual "Accuracy Gauge" provides real-time feedback to the user about their signal quality.
+
+### 🏗 State Management
+- **React Context**: Used for global authentication state (`AuthContext.tsx`).
+- **Hooks**: Heavy use of custom hooks (`useLocation.ts`, `useGeofence.ts`) to separate business logic from UI components, following the "Separation of Concerns" principle.
 
 ---
 
-## 🎨 Design System
-The app uses a centralized theme engine located in `src/theme/index.ts`:
-- **Colors**: Curated palette with vibrant primaries and deep surfaces.
-- **Spacing/Radius**: Calculated using `moderateScale` for perfect proportions.
-- **Typography**: Scaled via `fontScale` to respect system accessibility settings.
+## 4. Edge Case Handling
+
+- **Permission Denied**: Handled via `Location.requestForegroundPermissionsAsync()`. If denied, the app shows a dedicated "Permission Required" screen with a retry button.
+- **Location Unavailable/Timeout**: I implemented a **15-second timeout** for fetching the current position. If the device fails to get a fix (e.g., inside a basement), the user is notified to move to a clearer area.
+- **Offline Resilience**: Attendance records are cached in `AsyncStorage` (`src/utils/storage.ts`) if the initial database sync fails, ensuring no data loss during poor connectivity.
 
 ---
-© 2026 Geo-Attendance System. Built for high-performance workforce tracking.
+
+## 5. Assumptions
+- **Device GPS**: I assume the device has a functional GPS/GNSS receiver. Cellular-only location is treated as "low accuracy" and will likely fail the 50m threshold.
+- **Fixed Center**: For this assignment, center locations are dynamically fetched from the backend but can be defaulted to a hardcoded coordinate if the API is unreachable.
+- **Active Session**: The app assumes an active user session is required to link the attendance record to a specific identity.
+
+---
+
+## 6. Known Limitations
+- **Indoor Accuracy**: GPS signals are often blocked by concrete. The 50m accuracy requirement might be hard to meet deep indoors.
+- **Mock Locations**: While the accuracy threshold prevents some spoofing, dedicated "GPS Spoofer" apps on rooted devices might still bypass basic checks without native-level anti-cheat implementation.
+- **Battery Usage**: Continuous high-accuracy location watching can be battery-intensive; the app disconnects the watcher when the screen is blurred.
+
+---
+**Role**: Mobile Engineer Intern (React Native)  
+**Author**: Sweth shaw
